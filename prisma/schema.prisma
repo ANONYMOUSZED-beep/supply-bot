@@ -1,0 +1,470 @@
+// Prisma Schema for Supply-Bot
+// Autonomous Supply Chain Agent for SMB Manufacturing
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// ORGANIZATION & USERS
+// ===========================================
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  industry    String?
+  size        String?  // small, medium
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users              User[]
+  suppliers          Supplier[]
+  products           Product[]
+  inventoryItems     InventoryItem[]
+  purchaseOrders     PurchaseOrder[]
+  negotiations       Negotiation[]
+  integrations       Integration[]
+  cooperativeMembership CooperativeMembership?
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  role           String   @default("user") // admin, user, viewer
+  passwordHash   String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  activityLogs ActivityLog[]
+}
+
+// ===========================================
+// SUPPLIERS
+// ===========================================
+
+model Supplier {
+  id              String   @id @default(uuid())
+  organizationId  String
+  name            String
+  contactEmail    String?
+  contactPhone    String?
+  website         String?
+  apiEndpoint     String?  // For suppliers with API access
+  portalUrl       String?  // For browser automation
+  portalCredentials Json?  // Encrypted credentials for portal access
+  category        String?
+  tier            Int      @default(1) // 1 = primary, 2 = secondary, etc.
+  reliability     Float    @default(0.8) // 0-1 score
+  avgLeadTime     Int?     // Average lead time in days
+  minOrderValue   Float?
+  paymentTerms    String?
+  notes           String?
+  isActive        Boolean  @default(true)
+  lastScrapedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  supplierProducts SupplierProduct[]
+  purchaseOrders  PurchaseOrder[]
+  negotiations    Negotiation[]
+  priceHistory    PriceHistory[]
+  scrapingJobs    ScrapingJob[]
+}
+
+// ===========================================
+// PRODUCTS & INVENTORY
+// ===========================================
+
+model Product {
+  id              String   @id @default(uuid())
+  organizationId  String
+  sku             String
+  name            String
+  description     String?
+  category        String?
+  unit            String   @default("unit") // unit, kg, meter, etc.
+  specifications  Json?    // Technical specs
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  inventoryItem   InventoryItem?
+  supplierProducts SupplierProduct[]
+  bomItems        BOMItem[]
+  demandForecasts DemandForecast[]
+
+  @@unique([organizationId, sku])
+}
+
+model InventoryItem {
+  id                String   @id @default(uuid())
+  organizationId    String
+  productId         String   @unique
+  currentStock      Float    @default(0)
+  reservedStock     Float    @default(0) // Stock reserved for orders
+  reorderPoint      Float    // When to reorder
+  reorderQuantity   Float    // How much to order
+  safetyStock       Float    @default(0)
+  avgDailyUsage     Float?   // Calculated from history
+  lastCountDate     DateTime?
+  location          String?  // Warehouse location
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  product           Product      @relation(fields: [productId], references: [id])
+  stockMovements    StockMovement[]
+}
+
+model StockMovement {
+  id              String   @id @default(uuid())
+  inventoryItemId String
+  type            String   // in, out, adjustment, return
+  quantity        Float
+  reference       String?  // PO number, production order, etc.
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+}
+
+// ===========================================
+// SUPPLIER PRODUCTS & PRICING
+// ===========================================
+
+model SupplierProduct {
+  id              String   @id @default(uuid())
+  supplierId      String
+  productId       String
+  supplierSku     String?  // Supplier's own SKU
+  unitPrice       Float
+  currency        String   @default("USD")
+  minOrderQty     Float    @default(1)
+  leadTime        Int?     // Days
+  inStock         Boolean  @default(true)
+  stockLevel      Float?   // If available from supplier
+  lastUpdated     DateTime @default(now())
+  scrapedData     Json?    // Additional scraped info
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@unique([supplierId, productId])
+}
+
+model PriceHistory {
+  id          String   @id @default(uuid())
+  supplierId  String
+  productSku  String
+  price       Float
+  currency    String   @default("USD")
+  source      String   // scraped, api, manual, negotiated
+  recordedAt  DateTime @default(now())
+
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId, productSku, recordedAt])
+}
+
+// ===========================================
+// BILLS OF MATERIALS (BOM)
+// ===========================================
+
+model BOM {
+  id              String   @id @default(uuid())
+  organizationId  String
+  name            String
+  description     String?
+  version         String   @default("1.0")
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           BOMItem[]
+}
+
+model BOMItem {
+  id          String   @id @default(uuid())
+  bomId       String
+  productId   String
+  quantity    Float
+  unit        String
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  bom         BOM     @relation(fields: [bomId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
+}
+
+// ===========================================
+// PURCHASE ORDERS
+// ===========================================
+
+model PurchaseOrder {
+  id              String   @id @default(uuid())
+  organizationId  String
+  supplierId      String
+  orderNumber     String   @unique
+  status          String   @default("draft") // draft, pending, approved, sent, confirmed, shipped, received, cancelled
+  totalAmount     Float
+  currency        String   @default("USD")
+  negotiationId   String?
+  expectedDelivery DateTime?
+  actualDelivery  DateTime?
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id])
+  supplier        Supplier          @relation(fields: [supplierId], references: [id])
+  negotiation     Negotiation?      @relation(fields: [negotiationId], references: [id])
+  items           PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(uuid())
+  purchaseOrderId String
+  productSku      String
+  productName     String
+  quantity        Float
+  unitPrice       Float
+  totalPrice      Float
+  receivedQty     Float    @default(0)
+  notes           String?
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+}
+
+// ===========================================
+// NEGOTIATIONS (Diplomat Agent)
+// ===========================================
+
+model Negotiation {
+  id              String   @id @default(uuid())
+  organizationId  String
+  supplierId      String
+  type            String   // price, volume, terms, expedite
+  status          String   @default("pending") // pending, in_progress, accepted, rejected, expired
+  initialOffer    Json     // Our initial terms
+  counterOffers   Json[]   // Array of back-and-forth
+  finalTerms      Json?    // Agreed terms
+  savings         Float?   // Calculated savings
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  expiresAt       DateTime?
+  metadata        Json?
+
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  messages        NegotiationMessage[]
+  purchaseOrders  PurchaseOrder[]
+}
+
+model NegotiationMessage {
+  id              String   @id @default(uuid())
+  negotiationId   String
+  direction       String   // outbound, inbound
+  channel         String   // email, api, portal
+  subject         String?
+  content         String
+  metadata        Json?    // email headers, response codes, etc.
+  sentAt          DateTime @default(now())
+  deliveredAt     DateTime?
+  readAt          DateTime?
+
+  negotiation     Negotiation @relation(fields: [negotiationId], references: [id])
+}
+
+// ===========================================
+// SCOUT AGENT (Web Scraping)
+// ===========================================
+
+model ScrapingJob {
+  id          String   @id @default(uuid())
+  supplierId  String
+  type        String   // catalog, pricing, stock
+  status      String   @default("pending") // pending, running, completed, failed
+  config      Json     // Scraping configuration
+  results     Json?    // Scraped data
+  errorLog    String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+}
+
+// ===========================================
+// STRATEGIST AGENT (Predictions)
+// ===========================================
+
+model DemandForecast {
+  id              String   @id @default(uuid())
+  productId       String
+  forecastDate    DateTime
+  predictedDemand Float
+  confidence      Float    // 0-1 confidence score
+  method          String   // algorithm used
+  factors         Json?    // Contributing factors
+  createdAt       DateTime @default(now())
+
+  product         Product @relation(fields: [productId], references: [id])
+
+  @@index([productId, forecastDate])
+}
+
+model StockoutPrediction {
+  id              String   @id @default(uuid())
+  inventoryItemId String
+  predictedDate   DateTime
+  confidence      Float
+  daysUntil       Int
+  suggestedAction String   // reorder, expedite, find_alternative
+  suggestedQty    Float?
+  isResolved      Boolean  @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([inventoryItemId, predictedDate])
+}
+
+// ===========================================
+// INTEGRATIONS
+// ===========================================
+
+model Integration {
+  id              String   @id @default(uuid())
+  organizationId  String
+  type            String   // quickbooks, xero, shopify, woocommerce, custom_api
+  name            String
+  config          Json     // Encrypted credentials and settings
+  status          String   @default("inactive") // active, inactive, error
+  lastSyncAt      DateTime?
+  errorLog        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  syncLogs        SyncLog[]
+}
+
+model SyncLog {
+  id            String   @id @default(uuid())
+  integrationId String
+  direction     String   // inbound, outbound
+  entityType    String   // products, inventory, orders
+  recordsProcessed Int   @default(0)
+  recordsFailed Int      @default(0)
+  status        String   // running, completed, failed
+  errorLog      String?
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  integration   Integration @relation(fields: [integrationId], references: [id])
+}
+
+// ===========================================
+// COOPERATIVE / FEDERATION
+// ===========================================
+
+model Cooperative {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  industry        String
+  memberCount     Int      @default(0)
+  isActive        Boolean  @default(true)
+  settings        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  memberships     CooperativeMembership[]
+  bulkOrders      CooperativeBulkOrder[]
+}
+
+model CooperativeMembership {
+  id              String   @id @default(uuid())
+  organizationId  String   @unique
+  cooperativeId   String
+  joinedAt        DateTime @default(now())
+  status          String   @default("active") // active, suspended, inactive
+  contributionScore Float  @default(0) // Based on order volume
+  anonymizedData  Json?    // Anonymized demand data shared with cooperative
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  cooperative     Cooperative  @relation(fields: [cooperativeId], references: [id])
+}
+
+model CooperativeBulkOrder {
+  id              String   @id @default(uuid())
+  cooperativeId   String
+  productCategory String
+  totalQuantity   Float
+  targetPrice     Float
+  negotiatedPrice Float?
+  status          String   @default("collecting") // collecting, negotiating, confirmed, fulfilled
+  participantCount Int     @default(0)
+  deadline        DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  cooperative     Cooperative @relation(fields: [cooperativeId], references: [id])
+}
+
+// ===========================================
+// ACTIVITY LOGS
+// ===========================================
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  agentType   String?  // scout, strategist, diplomat, orchestrator
+  action      String
+  entityType  String?
+  entityId    String?
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([agentType, createdAt])
+}
+
+// ===========================================
+// AGENT TASKS & QUEUE
+// ===========================================
+
+model AgentTask {
+  id          String   @id @default(uuid())
+  agentType   String   // scout, strategist, diplomat
+  taskType    String   // scan_supplier, analyze_inventory, negotiate_price, etc.
+  priority    Int      @default(5) // 1 = highest
+  payload     Json
+  status      String   @default("pending") // pending, running, completed, failed, cancelled
+  result      Json?
+  errorLog    String?
+  retryCount  Int      @default(0)
+  maxRetries  Int      @default(3)
+  scheduledAt DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([agentType, status, priority])
+  @@index([scheduledAt])
+}

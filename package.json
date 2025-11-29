@@ -1,0 +1,64 @@
+{
+  "name": "supply-bot",
+  "version": "1.0.0",
+  "description": "Autonomous Supply Chain Agent for SMB Custom Manufacturing",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "supply-bot": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "cli": "tsx src/cli/index.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "tsx src/database/seed.ts",
+    "db:studio": "prisma studio",
+    "agents:scout": "tsx src/agents/scout/runner.ts",
+    "agents:strategist": "tsx src/agents/strategist/runner.ts",
+    "agents:diplomat": "tsx src/agents/diplomat/runner.ts",
+    "dashboard": "cd dashboard && npm run dev",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^5.7.0",
+    "axios": "^1.6.2",
+    "bull": "^4.12.0",
+    "cheerio": "^1.0.0-rc.12",
+    "commander": "^11.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.7",
+    "openai": "^4.24.0",
+    "playwright": "^1.40.1",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.5",
+    "@types/nodemailer": "^6.4.14",
+    "@types/uuid": "^9.0.7",
+    "prisma": "^5.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

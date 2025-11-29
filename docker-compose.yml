@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: supplybot-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: supplybot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Queue
+  redis:
+    image: redis:7-alpine
+    container_name: supplybot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Supply-Bot API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supplybot-api
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplybot
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - API_PORT=3001
+      - API_SECRET=${API_SECRET:-your-super-secret-key-change-me}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+    restart: unless-stopped
+
+  # Scout Agent (Separate Process)
+  scout-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supplybot-scout
+    command: npm run agents:scout
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplybot
+      - REDIS_URL=redis://redis:6379
+      - PLAYWRIGHT_HEADLESS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./screenshots:/app/screenshots
+    restart: unless-stopped
+
+  # Strategist Agent (Separate Process)
+  strategist-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supplybot-strategist
+    command: npm run agents:strategist
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplybot
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Diplomat Agent (Separate Process)
+  diplomat-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supplybot-diplomat
+    command: npm run agents:diplomat
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/supplybot
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Dashboard (Next.js)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: supplybot-dashboard
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: supplybot-network

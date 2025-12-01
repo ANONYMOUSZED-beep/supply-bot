@@ -2,11 +2,5 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "crons": [
-    {
-      "path": "/api/keep-alive",
-      "schedule": "*/14 * * * *"
-    }
-  ]
+  "installCommand": "npm install"
 }

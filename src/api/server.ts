@@ -354,9 +354,49 @@ app.get('/api/suppliers', authenticateToken, async (req: AuthRequest, res) => {
       orderBy: { name: 'asc' },
     });
 
-    res.json(suppliers);
+    // Map to frontend-expected format
+    const mappedSuppliers = suppliers.map(s => ({
+      ...s,
+      rating: s.reliability || 0,
+      portalType: s.category || 'static',
+      lastScanned: s.lastScrapedAt?.toISOString() || null,
+    }));
+
+    res.json(mappedSuppliers);
   } catch (error) {
     logger.error('Get suppliers error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/suppliers', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { name, website, contactEmail, contactPhone, portalType } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Supplier name is required' });
+    }
+
+    const supplier = await prisma.supplier.create({
+      data: {
+        name,
+        website: website || null,
+        contactEmail: contactEmail || null,
+        contactPhone: contactPhone || null,
+        portalUrl: website || null,
+        category: portalType || 'general',
+        isActive: true,
+        organizationId: req.user!.organizationId,
+      },
+      include: {
+        _count: { select: { supplierProducts: true, purchaseOrders: true } },
+      },
+    });
+
+    // Add portalType to response for frontend compatibility
+    res.status(201).json({ ...supplier, portalType: portalType || 'static', rating: supplier.reliability || 0 });
+  } catch (error) {
+    logger.error('Create supplier error', { error });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

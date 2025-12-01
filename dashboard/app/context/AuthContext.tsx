@@ -49,8 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Redirect to login if not authenticated (except on login page)
-    if (!isLoading && !token && pathname !== '/login') {
+    // Public routes that don't require authentication
+    const publicRoutes = ['/login', '/signup', '/onboarding'];
+    const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
+    
+    // Redirect to login if not authenticated (except on public pages)
+    if (!isLoading && !token && !isPublicRoute) {
       router.push('/login');
     }
   }, [isLoading, token, pathname, router]);

@@ -83,7 +83,7 @@ export type Config = z.infer<typeof configSchema>;
 function loadConfig(): Config {
   const config = {
     environment: process.env.NODE_ENV || 'development',
-    port: parseInt(process.env.API_PORT || '3001'),
+    port: parseInt(process.env.PORT || process.env.API_PORT || '3001'),
     database: {
       url: process.env.DATABASE_URL || '',
       redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -101,9 +101,9 @@ function loadConfig(): Config {
       fromName: process.env.EMAIL_FROM_NAME || 'Supply-Bot',
     },
     api: {
-      port: parseInt(process.env.API_PORT || '3001'),
+      port: parseInt(process.env.PORT || process.env.API_PORT || '3001'),
       secret: process.env.API_SECRET || 'development-secret-key-change-in-production',
-      corsOrigin: process.env.API_CORS_ORIGIN || 'http://localhost:3000',
+      corsOrigin: process.env.API_CORS_ORIGIN || '*',
     },
     agents: {
       scout: {

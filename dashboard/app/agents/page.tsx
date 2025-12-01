@@ -19,7 +19,7 @@ export default function AgentsPage() {
   const testAI = async () => {
     setLoading('ai');
     try {
-      const result = await api.get('/api/agents/test/ai');
+      const result = await api.request<TestResult>('/api/agents/test/ai');
       setResults(prev => ({ ...prev, ai: result }));
     } catch (error: any) {
       setResults(prev => ({ ...prev, ai: { agent: 'AI', message: 'Failed', error: error.message } }));
@@ -30,7 +30,7 @@ export default function AgentsPage() {
   const testScout = async () => {
     setLoading('scout');
     try {
-      const result = await api.post('/api/agents/test/scout', {});
+      const result = await api.request<TestResult>('/api/agents/test/scout', { method: 'POST' });
       setResults(prev => ({ ...prev, scout: result }));
     } catch (error: any) {
       setResults(prev => ({ ...prev, scout: { agent: 'Scout', message: 'Failed', error: error.message } }));
@@ -41,7 +41,7 @@ export default function AgentsPage() {
   const testStrategist = async () => {
     setLoading('strategist');
     try {
-      const result = await api.post('/api/agents/test/strategist', {});
+      const result = await api.request<TestResult>('/api/agents/test/strategist', { method: 'POST' });
       setResults(prev => ({ ...prev, strategist: result }));
     } catch (error: any) {
       setResults(prev => ({ ...prev, strategist: { agent: 'Strategist', message: 'Failed', error: error.message } }));
@@ -52,7 +52,7 @@ export default function AgentsPage() {
   const testDiplomat = async () => {
     setLoading('diplomat');
     try {
-      const result = await api.post('/api/agents/test/diplomat', {});
+      const result = await api.request<TestResult>('/api/agents/test/diplomat', { method: 'POST' });
       setResults(prev => ({ ...prev, diplomat: result }));
     } catch (error: any) {
       setResults(prev => ({ ...prev, diplomat: { agent: 'Diplomat', message: 'Failed', error: error.message } }));

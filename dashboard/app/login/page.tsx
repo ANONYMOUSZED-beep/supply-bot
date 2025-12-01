@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { CubeIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { api } from '../../lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,25 +21,12 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Use context login to update state AND localStorage
-        login(data.token, data.user);
-        router.push('/');
-      } else {
-        setError(data.error || 'Login failed');
-      }
-    } catch (err) {
-      setError('Unable to connect to server. Make sure the API is running on port 3001.');
+      const data = await api.login(email, password);
+      // Use context login to update state AND localStorage
+      login(data.token, data.user);
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || 'Unable to connect to server.');
     } finally {
       setLoading(false);
     }

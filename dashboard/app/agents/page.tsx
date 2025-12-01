@@ -10,6 +10,9 @@ interface TestResult {
   error?: string;
   response?: string;
   success?: boolean;
+  suppliers?: any[];
+  supplier?: string;
+  product?: string;
 }
 
 export default function AgentsPage() {

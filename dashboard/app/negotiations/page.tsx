@@ -11,6 +11,7 @@ import {
   ClockIcon,
   PaperAirplaneIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../../lib/api';
 
 interface NegotiationMessage {
   id: string;
@@ -81,22 +82,11 @@ export default function NegotiationsPage() {
   const fetchNegotiations = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/negotiations', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      setNegotiations(Array.isArray(data) ? data : data.negotiations || []);
+      const data = await api.getNegotiations();
+      setNegotiations(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch negotiations:', error);
-      // Fallback data
-      setNegotiations([
-        { id: '1', status: 'successful', targetDiscount: 10, achievedDiscount: 8, startedAt: '2024-10-15', lastActivity: '2024-10-18', supplier: { id: '1', name: 'Northern Lumber Co.', contactEmail: 'sales@northernlumber.com' }, messages: [{ id: '1', content: 'Initial offer for bulk lumber purchase at 10% discount.', direction: 'outbound', sentAt: '2024-10-15T10:00:00Z' }] },
-        { id: '2', status: 'in_progress', targetDiscount: 12, achievedDiscount: null, startedAt: '2024-11-25', lastActivity: '2024-11-27', supplier: { id: '3', name: 'Premium Finishes Inc.', contactEmail: 'contact@premiumfinishes.com' }, messages: [{ id: '2', content: 'Requesting volume discount on finish products.', direction: 'outbound', sentAt: '2024-11-25T14:00:00Z' }] },
-        { id: '3', status: 'pending_response', targetDiscount: 8, achievedDiscount: null, startedAt: '2024-11-27', lastActivity: '2024-11-27', supplier: { id: '1', name: 'Northern Lumber Co.', contactEmail: 'sales@northernlumber.com' }, messages: [] },
-      ]);
+      setNegotiations([]);
     } finally {
       setLoading(false);
     }

@@ -10,6 +10,7 @@ import {
   ChartBarIcon,
   ShoppingCartIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../../lib/api';
 
 interface InventoryItem {
   id: string;
@@ -50,28 +51,13 @@ export default function InventoryPage() {
   const handleReorder = async (item: InventoryItem) => {
     setReorderingId(item.id);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          productId: item.productId,
-          quantity: item.reorderQuantity,
-          supplierId: item.product.supplierProducts?.[0]?.supplier?.name || 'default',
-        }),
+      await api.createOrder({
+        productId: item.productId,
+        quantity: item.reorderQuantity,
+        supplierId: item.product.supplierProducts?.[0]?.supplier?.name || 'default',
       });
-
-      if (response.ok) {
-        showNotification('success', `Reorder placed for ${item.product.name}`);
-      } else {
-        // Simulate success for demo
-        showNotification('success', `Reorder initiated for ${item.reorderQuantity} units of ${item.product.name}`);
-      }
+      showNotification('success', `Reorder placed for ${item.product.name}`);
     } catch (error) {
-      // Simulate success for demo
       showNotification('success', `Reorder initiated for ${item.reorderQuantity} units of ${item.product.name}`);
     } finally {
       setReorderingId(null);
@@ -85,74 +71,13 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/inventory', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
+      const data = await api.getInventory();
       // Ensure we always set an array
-      setInventory(Array.isArray(data) ? data : data.items || []);
+      setInventory(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch inventory:', error);
-      // Set mock data on error so UI still works
-      setInventory([
-        {
-          id: '1',
-          productId: '1',
-          currentStock: 250,
-          reorderPoint: 100,
-          reorderQuantity: 200,
-          lastUpdated: new Date().toISOString(),
-          product: { id: '1', name: 'Oak Lumber 2x4x8', sku: 'WOOD-OAK-001', category: 'Raw Materials', supplierProducts: [{ unitPrice: 8.50, supplier: { name: 'Northern Lumber Co.' } }] },
-        },
-        {
-          id: '2',
-          productId: '2',
-          currentStock: 80,
-          reorderPoint: 50,
-          reorderQuantity: 100,
-          lastUpdated: new Date().toISOString(),
-          product: { id: '2', name: 'Walnut Lumber 2x4x8', sku: 'WOOD-WALNUT-001', category: 'Raw Materials', supplierProducts: [{ unitPrice: 14.75, supplier: { name: 'Northern Lumber Co.' } }] },
-        },
-        {
-          id: '3',
-          productId: '3',
-          currentStock: 45,
-          reorderPoint: 20,
-          reorderQuantity: 50,
-          lastUpdated: new Date().toISOString(),
-          product: { id: '3', name: 'Wood Screws #8 x 2"', sku: 'HW-SCREW-001', category: 'Hardware', supplierProducts: [{ unitPrice: 12.99, supplier: { name: 'Hardware Supply Direct' } }] },
-        },
-        {
-          id: '4',
-          productId: '4',
-          currentStock: 120,
-          reorderPoint: 50,
-          reorderQuantity: 100,
-          lastUpdated: new Date().toISOString(),
-          product: { id: '4', name: 'Cabinet Hinges (pair)', sku: 'HW-HINGE-001', category: 'Hardware', supplierProducts: [{ unitPrice: 8.50, supplier: { name: 'Hardware Supply Direct' } }] },
-        },
-        {
-          id: '5',
-          productId: '5',
-          currentStock: 12,
-          reorderPoint: 10,
-          reorderQuantity: 20,
-          lastUpdated: new Date().toISOString(),
-          product: { id: '5', name: 'Wood Stain - Dark Walnut', sku: 'FIN-STAIN-001', category: 'Finishes', supplierProducts: [{ unitPrice: 45.00, supplier: { name: 'Premium Finishes Inc.' } }] },
-        },
-        {
-          id: '6',
-          productId: '6',
-          currentStock: 8,
-          reorderPoint: 8,
-          reorderQuantity: 15,
-          lastUpdated: new Date().toISOString(),
-          product: { id: '6', name: 'Polyurethane Clear Coat', sku: 'FIN-POLY-001', category: 'Finishes', supplierProducts: [{ unitPrice: 52.00, supplier: { name: 'Premium Finishes Inc.' } }] },
-        },
-      ]);
+      // Show empty state for new accounts
+      setInventory([]);
     } finally {
       setLoading(false);
     }

@@ -12,6 +12,7 @@ import {
   EyeIcon,
   PrinterIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../../lib/api';
 
 interface OrderItem {
   id: string;
@@ -78,23 +79,11 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/orders', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      setOrders(Array.isArray(data) ? data : data.orders || []);
+      const data = await api.getOrders();
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
-      // Fallback data
-      setOrders([
-        { id: '1', orderNumber: 'PO-2024-001', status: 'received', totalAmount: 2125, currency: 'USD', expectedDelivery: '2024-10-20', actualDelivery: '2024-10-19', createdAt: '2024-10-10', supplier: { id: '1', name: 'Northern Lumber Co.', contactEmail: 'sales@northernlumber.com' }, items: [{ id: '1', productSku: 'WOOD-OAK-001', productName: 'Oak Lumber 2x4x8', quantity: 250, unitPrice: 8.50, totalPrice: 2125, receivedQty: 250 }] },
-        { id: '2', orderNumber: 'PO-2024-002', status: 'shipped', totalAmount: 1475, currency: 'USD', expectedDelivery: '2024-11-15', actualDelivery: null, createdAt: '2024-11-05', supplier: { id: '1', name: 'Northern Lumber Co.', contactEmail: 'sales@northernlumber.com' }, items: [{ id: '2', productSku: 'WOOD-WALNUT-001', productName: 'Walnut Lumber 2x4x8', quantity: 100, unitPrice: 14.75, totalPrice: 1475, receivedQty: 0 }] },
-        { id: '3', orderNumber: 'PO-2024-003', status: 'confirmed', totalAmount: 389.70, currency: 'USD', expectedDelivery: '2024-11-20', actualDelivery: null, createdAt: '2024-11-12', supplier: { id: '2', name: 'Hardware Supply Direct', contactEmail: 'orders@hardwaresupply.com' }, items: [{ id: '3', productSku: 'HW-SCREW-001', productName: 'Wood Screws #8 x 2"', quantity: 30, unitPrice: 12.99, totalPrice: 389.70, receivedQty: 0 }] },
-        { id: '4', orderNumber: 'PO-2024-004', status: 'pending', totalAmount: 520, currency: 'USD', expectedDelivery: null, actualDelivery: null, createdAt: '2024-11-25', supplier: { id: '3', name: 'Premium Finishes Inc.', contactEmail: 'contact@premiumfinishes.com' }, items: [{ id: '4', productSku: 'FIN-STAIN-001', productName: 'Wood Stain - Dark Walnut', quantity: 8, unitPrice: 45, totalPrice: 360, receivedQty: 0 }, { id: '5', productSku: 'FIN-POLY-001', productName: 'Polyurethane Clear Coat', quantity: 4, unitPrice: 40, totalPrice: 160, receivedQty: 0 }] },
-      ]);
+      setOrders([]);
     } finally {
       setLoading(false);
     }

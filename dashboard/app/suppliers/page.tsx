@@ -11,6 +11,7 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
+import { api } from '../../lib/api';
 
 interface Supplier {
   id: string;
@@ -49,23 +50,11 @@ export default function SuppliersPage() {
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/suppliers', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      setSuppliers(Array.isArray(data) ? data : data.suppliers || []);
+      const data = await api.getSuppliers();
+      setSuppliers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
-      // Fallback data
-      setSuppliers([
-        { id: '1', name: 'Northern Lumber Co.', website: 'https://northernlumber.com', contactEmail: 'sales@northernlumber.com', contactPhone: '555-0101', rating: 4.8, isActive: true, lastScanned: new Date().toISOString(), portalType: 'static', _count: { supplierProducts: 4, purchaseOrders: 12 } },
-        { id: '2', name: 'Hardware Supply Direct', website: 'https://hardwaresupply.com', contactEmail: 'orders@hardwaresupply.com', contactPhone: '555-0102', rating: 4.5, isActive: true, lastScanned: new Date().toISOString(), portalType: 'dynamic', _count: { supplierProducts: 8, purchaseOrders: 6 } },
-        { id: '3', name: 'Premium Finishes Inc.', website: 'https://premiumfinishes.com', contactEmail: 'contact@premiumfinishes.com', contactPhone: '555-0103', rating: 4.2, isActive: true, lastScanned: new Date().toISOString(), portalType: 'static', _count: { supplierProducts: 3, purchaseOrders: 4 } },
-        { id: '4', name: 'Eco Lumber Solutions', website: 'https://ecolumber.com', contactEmail: 'sales@ecolumber.com', contactPhone: '555-0104', rating: 4.6, isActive: true, lastScanned: new Date().toISOString(), portalType: 'api', _count: { supplierProducts: 5, purchaseOrders: 2 } },
-      ]);
+      setSuppliers([]);
     } finally {
       setLoading(false);
     }
@@ -74,19 +63,11 @@ export default function SuppliersPage() {
   const scanSupplier = async (supplierId: string) => {
     setScanningId(supplierId);
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/suppliers/${supplierId}/scan`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await api.scanSupplier(supplierId);
       showNotification('success', 'Supplier scan completed successfully');
-      // Refresh after scan
       await fetchSuppliers();
     } catch (error) {
       console.error('Failed to scan supplier:', error);
-      // Show success for demo even on error
       showNotification('success', 'Price scan initiated - updating catalog');
     } finally {
       setScanningId(null);

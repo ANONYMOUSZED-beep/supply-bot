@@ -67,19 +67,13 @@ export default function Dashboard() {
         setData(apiData);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
-        // Fallback to mock data
+        // Show empty state for new accounts instead of fake data
         setData({
-          inventory: { totalItems: 6, totalStock: 515 },
-          suppliers: 4,
-          pendingNegotiations: 2,
-          recentOrders: [
-            { id: '1', orderNumber: 'PO-2024-001', supplier: { name: 'Northern Lumber Co.' }, status: 'received', totalAmount: 2125.00 },
-            { id: '2', orderNumber: 'PO-2024-002', supplier: { name: 'Northern Lumber Co.' }, status: 'shipped', totalAmount: 1475.00 },
-            { id: '3', orderNumber: 'PO-2024-003', supplier: { name: 'Hardware Supply Direct' }, status: 'confirmed', totalAmount: 389.70 },
-          ],
-          lowStockItems: [
-            { id: '1', sku: 'FIN-POLY-001', name: 'Polyurethane Clear Coat', currentStock: 8, reorderPoint: 8 },
-          ],
+          inventory: { totalItems: 0, totalStock: 0 },
+          suppliers: 0,
+          pendingNegotiations: 0,
+          recentOrders: [],
+          lowStockItems: [],
           queueStatus: { waiting: 0, active: 0, completed: 0, failed: 0 },
         });
       } finally {

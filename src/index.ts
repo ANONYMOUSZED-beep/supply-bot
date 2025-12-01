@@ -13,11 +13,13 @@ import { prisma } from './database/client.js';
 let orchestrator: AgentOrchestrator | null = null;
 
 async function main() {
+  const port = process.env.PORT || config.port || 3001;
+  
   logger.info('='.repeat(60));
   logger.info('🤖 Supply-Bot - Autonomous Procurement Agent');
   logger.info('='.repeat(60));
   logger.info(`Environment: ${config.environment}`);
-  logger.info(`API Port: ${config.port}`);
+  logger.info(`API Port: ${port}`);
   
   try {
     // Test database connection
@@ -25,24 +27,29 @@ async function main() {
     await prisma.$connect();
     logger.info('✅ Database connected');
     
-    // Start API server
+    // Start API server FIRST (so port is detected)
     logger.info('Starting API server...');
     await startServer();
-    logger.info(`✅ API server running on port ${config.port}`);
+    logger.info(`✅ API server running on port ${port}`);
     
-    // Initialize and start agent orchestrator
+    // Initialize agent orchestrator (non-blocking, allow failures)
     logger.info('Initializing agent orchestrator...');
-    orchestrator = new AgentOrchestrator();
-    await orchestrator.initialize();
-    logger.info('✅ Agent orchestrator started');
-    
-    // Log agent schedules
-    logger.info('='.repeat(60));
-    logger.info('📅 Agent Schedules:');
-    logger.info('  - Scout Agent: Every 4 hours');
-    logger.info('  - Strategist Agent: Daily at 6:00 AM');
-    logger.info('  - Diplomat Agent: Every 30 minutes');
-    logger.info('='.repeat(60));
+    try {
+      orchestrator = new AgentOrchestrator();
+      await orchestrator.initialize();
+      logger.info('✅ Agent orchestrator started');
+      
+      // Log agent schedules
+      logger.info('='.repeat(60));
+      logger.info('📅 Agent Schedules:');
+      logger.info('  - Scout Agent: Every 4 hours');
+      logger.info('  - Strategist Agent: Daily at 6:00 AM');
+      logger.info('  - Diplomat Agent: Every 30 minutes');
+      logger.info('='.repeat(60));
+    } catch (orchError) {
+      logger.warn('Agent orchestrator failed to initialize (agents disabled)', { error: orchError });
+      logger.info('API server will continue running without agents');
+    }
     
     logger.info('🚀 Supply-Bot is fully operational!');
     logger.info('Press Ctrl+C to gracefully shutdown');

@@ -530,9 +530,11 @@ let server: ReturnType<typeof app.listen> | null = null;
 export async function startServer() {
   await connectDatabase();
 
+  const port = process.env.PORT || config.api.port || 3001;
+  
   return new Promise<void>((resolve) => {
-    server = app.listen(config.api.port, () => {
-      logger.info(`API server running on port ${config.api.port}`);
+    server = app.listen(Number(port), '0.0.0.0', () => {
+      logger.info(`API server running on port ${port}`);
       resolve();
     });
   });

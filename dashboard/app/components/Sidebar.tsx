@@ -13,6 +13,7 @@ import {
   UserGroupIcon,
   ChartBarIcon,
   ArrowRightOnRectangleIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Suppliers', href: '/suppliers', icon: TruckIcon },
   { name: 'Negotiations', href: '/negotiations', icon: ChatBubbleLeftRightIcon },
   { name: 'Orders', href: '/orders', icon: DocumentTextIcon },
+  { name: 'AI Agents', href: '/agents', icon: CpuChipIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Federation', href: '/federation', icon: UserGroupIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },

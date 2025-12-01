@@ -29,6 +29,124 @@ interface Supplier {
   };
 }
 
+// Helper to normalize URL (add https:// if missing)
+function normalizeUrl(url: string): string {
+  if (!url) return '';
+  url = url.trim();
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+    return `https://${url}`;
+  }
+  return url;
+}
+
+// Add Supplier Form Component
+function AddSupplierForm({ 
+  onClose, 
+  onSuccess, 
+  showNotification 
+}: { 
+  onClose: () => void; 
+  onSuccess: () => void; 
+  showNotification: (type: 'success' | 'error', message: string) => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    website: '',
+    contactEmail: '',
+    portalType: 'static'
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    
+    try {
+      await api.createSupplier({
+        name: formData.name,
+        website: normalizeUrl(formData.website),
+        contactEmail: formData.contactEmail,
+        portalType: formData.portalType,
+      });
+      onSuccess();
+    } catch (error) {
+      console.error('Failed to add supplier:', error);
+      showNotification('error', 'Failed to add supplier');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
+          <input 
+            type="text" 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg" 
+            placeholder="Enter supplier name" 
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required 
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+          <input 
+            type="text" 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg" 
+            placeholder="www.supplier.com or https://supplier.com"
+            value={formData.website}
+            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+          />
+          <p className="text-xs text-gray-500 mt-1">URL will be auto-formatted if needed</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+          <input 
+            type="email" 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg" 
+            placeholder="contact@supplier.com"
+            value={formData.contactEmail}
+            onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Portal Type</label>
+          <select 
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            value={formData.portalType}
+            onChange={(e) => setFormData({ ...formData, portalType: e.target.value })}
+          >
+            <option value="static">Static</option>
+            <option value="dynamic">Dynamic</option>
+            <option value="api">API</option>
+            <option value="legacy">Legacy</option>
+          </select>
+        </div>
+      </div>
+      <div className="mt-6 flex gap-3">
+        <button 
+          type="button" 
+          onClick={onClose} 
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          disabled={submitting}
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          disabled={submitting}
+        >
+          {submitting ? 'Adding...' : 'Add Supplier'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,35 +236,11 @@ export default function SuppliersPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Add New Supplier</h3>
-            <form onSubmit={(e) => { e.preventDefault(); showNotification('success', 'Supplier added successfully'); setShowAddModal(false); }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
-                  <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Enter supplier name" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                  <input type="url" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://supplier.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
-                  <input type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="contact@supplier.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Portal Type</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    <option value="static">Static</option>
-                    <option value="dynamic">Dynamic</option>
-                    <option value="api">API</option>
-                    <option value="legacy">Legacy</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-6 flex gap-3">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Supplier</button>
-              </div>
-            </form>
+            <AddSupplierForm 
+              onClose={() => setShowAddModal(false)} 
+              onSuccess={() => { fetchSuppliers(); setShowAddModal(false); showNotification('success', 'Supplier added successfully'); }}
+              showNotification={showNotification}
+            />
           </div>
         </div>
       )}

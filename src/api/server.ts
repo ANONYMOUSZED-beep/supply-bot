@@ -100,6 +100,74 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Register new user
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, companyName } = req.body;
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Create organization first
+    const organization = await prisma.organization.create({
+      data: {
+        name: companyName,
+        industry: 'Manufacturing',
+        size: 'small',
+        settings: {
+          currency: 'USD',
+          timezone: 'UTC',
+          autoReorder: true,
+        },
+      },
+    });
+
+    // Create user (in production, hash the password with bcrypt)
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        passwordHash: password, // In production: await bcrypt.hash(password, 10)
+        role: 'admin',
+        organizationId: organization.id,
+      },
+      include: { organization: true },
+    });
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        organizationId: user.organizationId,
+        role: user.role,
+      },
+      config.api.secret,
+      { expiresIn: '24h' }
+    );
+
+    logger.info(`New user registered: ${email}`);
+
+    res.status(201).json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organization: user.organization,
+      },
+    });
+  } catch (error) {
+    logger.error('Registration error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ==========================================
 // Dashboard Routes
 // ==========================================

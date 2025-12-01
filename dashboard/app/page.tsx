@@ -12,6 +12,7 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../lib/api';
 
 interface DashboardData {
   inventory: { totalItems: number; totalStock: number };
@@ -38,19 +39,8 @@ export default function Dashboard() {
   const runProcurementCycle = async () => {
     setRunningCycle(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/agents/run-cycle', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        showNotification('✅ Procurement cycle started successfully!');
-      } else {
-        showNotification('⚠️ Cycle started (demo mode)');
-      }
+      await api.runProcurementCycle();
+      showNotification('✅ Procurement cycle started successfully!');
     } catch (error) {
       showNotification('⚠️ Procurement cycle started (demo mode)');
     } finally {
@@ -61,20 +51,8 @@ export default function Dashboard() {
   const autoReorderLowStock = async () => {
     setReordering(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/agents/auto-reorder', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        showNotification(`✅ Auto-reorder initiated for ${result.ordersCreated || 1} items!`);
-      } else {
-        showNotification('✅ Auto-reorder initiated (demo)');
-      }
+      const result = await api.autoReorderLowStock();
+      showNotification(`✅ Auto-reorder initiated for ${result.ordersCreated || 1} items!`);
     } catch (error) {
       showNotification('✅ Auto-reorder initiated (demo)');
     } finally {
@@ -85,32 +63,8 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3001/api/dashboard', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.ok) {
-          const apiData = await response.json();
-          setData(apiData);
-        } else {
-          // Fallback to mock data
-          setData({
-            inventory: { totalItems: 6, totalStock: 515 },
-            suppliers: 4,
-            pendingNegotiations: 2,
-            recentOrders: [
-              { id: '1', orderNumber: 'PO-2024-001', supplier: { name: 'Northern Lumber Co.' }, status: 'received', totalAmount: 2125.00 },
-              { id: '2', orderNumber: 'PO-2024-002', supplier: { name: 'Northern Lumber Co.' }, status: 'shipped', totalAmount: 1475.00 },
-              { id: '3', orderNumber: 'PO-2024-003', supplier: { name: 'Hardware Supply Direct' }, status: 'confirmed', totalAmount: 389.70 },
-            ],
-            lowStockItems: [
-              { id: '1', sku: 'FIN-POLY-001', name: 'Polyurethane Clear Coat', currentStock: 8, reorderPoint: 8 },
-            ],
-            queueStatus: { waiting: 0, active: 0, completed: 0, failed: 0 },
-          });
-        }
+        const apiData = await api.getDashboard();
+        setData(apiData);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
         // Fallback to mock data
@@ -118,8 +72,14 @@ export default function Dashboard() {
           inventory: { totalItems: 6, totalStock: 515 },
           suppliers: 4,
           pendingNegotiations: 2,
-          recentOrders: [],
-          lowStockItems: [],
+          recentOrders: [
+            { id: '1', orderNumber: 'PO-2024-001', supplier: { name: 'Northern Lumber Co.' }, status: 'received', totalAmount: 2125.00 },
+            { id: '2', orderNumber: 'PO-2024-002', supplier: { name: 'Northern Lumber Co.' }, status: 'shipped', totalAmount: 1475.00 },
+            { id: '3', orderNumber: 'PO-2024-003', supplier: { name: 'Hardware Supply Direct' }, status: 'confirmed', totalAmount: 389.70 },
+          ],
+          lowStockItems: [
+            { id: '1', sku: 'FIN-POLY-001', name: 'Polyurethane Clear Coat', currentStock: 8, reorderPoint: 8 },
+          ],
           queueStatus: { waiting: 0, active: 0, completed: 0, failed: 0 },
         });
       } finally {

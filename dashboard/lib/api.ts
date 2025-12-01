@@ -65,6 +65,13 @@ class ApiClient {
     });
   }
 
+  async register(name: string, email: string, password: string, companyName: string) {
+    return this.request<{ token: string; user: any }>('/api/auth/register', {
+      method: 'POST',
+      body: { name, email, password, companyName },
+    });
+  }
+
   // Dashboard
   async getDashboard() {
     return this.request<any>('/api/dashboard');

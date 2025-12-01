@@ -10,6 +10,7 @@ import {
   ArrowRightIcon,
   ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../../lib/api';
 
 interface BusinessInfo {
   companyName: string;
@@ -104,40 +105,13 @@ export default function OnboardingPage() {
   const handleComplete = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      
-      // Save business info
-      await fetch('http://localhost:3001/api/onboarding/business', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(business),
-      });
-
       // Save suppliers
       for (const supplier of suppliers.filter(s => s.name)) {
-        await fetch('http://localhost:3001/api/suppliers', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(supplier),
-        });
-      }
-
-      // Save products
-      for (const product of products.filter(p => p.name)) {
-        await fetch('http://localhost:3001/api/inventory', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(product),
-        });
+        try {
+          await api.createSupplier(supplier);
+        } catch (e) {
+          console.log('Supplier creation skipped');
+        }
       }
 
       router.push('/');

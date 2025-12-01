@@ -10,6 +10,7 @@ import {
   UserIcon,
   BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
+import { api } from '../../lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -40,24 +41,12 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          companyName: formData.companyName,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
-      }
+      const data = await api.register(
+        formData.name,
+        formData.email,
+        formData.password,
+        formData.companyName
+      );
 
       // Save token and redirect to onboarding
       localStorage.setItem('token', data.token);
@@ -65,15 +54,7 @@ export default function SignupPage() {
       
       router.push('/onboarding');
     } catch (err: any) {
-      // For demo, just create a mock user and continue
-      localStorage.setItem('token', 'demo-token');
-      localStorage.setItem('user', JSON.stringify({
-        id: 'new-user',
-        name: formData.name,
-        email: formData.email,
-        companyName: formData.companyName,
-      }));
-      router.push('/onboarding');
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -716,11 +716,18 @@ async function seed() {
   logger.info('Database seed completed successfully!');
 }
 
-seed()
-  .catch((e) => {
-    logger.error('Seed failed', { error: e });
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Export for CLI usage
+export { seed as seedDatabase };
+
+// Run directly if this is the main module
+const isMainModule = import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`;
+if (isMainModule) {
+  seed()
+    .catch((e) => {
+      logger.error('Seed failed', { error: e });
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

@@ -162,7 +162,7 @@ export class ScoutAgent extends BaseAgent {
               inStock: scraped.inStock,
               stockLevel: scraped.stockLevel,
               lastUpdated: new Date(),
-              scrapedData: scraped.rawData,
+              scrapedData: JSON.parse(JSON.stringify(scraped.rawData || {})),
             },
           });
         }

@@ -99,7 +99,7 @@ export class AgentOrchestrator {
         agentType: task.agentType,
         taskType: task.taskType,
         priority: task.priority || 5,
-        payload: task.payload,
+        payload: JSON.parse(JSON.stringify(task.payload)),
         status: 'pending',
         scheduledAt: new Date(),
       },
@@ -147,11 +147,11 @@ export class AgentOrchestrator {
       data: {
         agentType: queuedTask.agentType,
         action: task.type,
-        details: {
+        details: JSON.parse(JSON.stringify({
           success: result.success,
-          error: result.error,
-          metadata: result.metadata,
-        },
+          error: result.error || null,
+          metadata: result.metadata || null,
+        })),
       },
     });
 

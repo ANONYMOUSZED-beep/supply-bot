@@ -353,7 +353,7 @@ export class PortalAutomationService {
         postLoginCheck: '.dashboard, .account, nav',
       };
 
-      const credentials = supplier.portalCredentials as PortalCredentials;
+      const credentials = supplier.portalCredentials as unknown as PortalCredentials;
 
       // Login
       const loginResult = await this.loginToPortal(supplierId, portalConfig, credentials);
@@ -390,11 +390,11 @@ export class PortalAutomationService {
               action: 'portal_order_placed',
               entityType: 'supplier',
               entityId: supplierId,
-              details: {
+              details: JSON.parse(JSON.stringify({
                 orderNumber: orderResult.orderNumber,
                 items: items,
-                confirmationUrl: orderResult.confirmationUrl,
-              },
+                confirmationUrl: orderResult.confirmationUrl || null,
+              })),
             },
           });
         }
@@ -443,7 +443,7 @@ export class PortalAutomationService {
       const loginResult = await this.loginToPortal(
         supplierId,
         portalConfig,
-        supplier.portalCredentials as PortalCredentials
+        supplier.portalCredentials as unknown as PortalCredentials
       );
 
       if (!loginResult.success || !loginResult.page) {

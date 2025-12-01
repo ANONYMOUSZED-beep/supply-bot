@@ -238,7 +238,7 @@ export class DiplomatAgent extends BaseAgent {
             strategy: strategy.approach,
           },
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-          metadata: { strategy },
+          metadata: JSON.parse(JSON.stringify({ strategy })),
         },
       });
 

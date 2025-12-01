@@ -330,7 +330,8 @@ program
         scheduledAt: new Date(),
       });
       console.log('✅ Inventory analysis complete');
-      console.log(`   Found ${predictions?.predictions?.length || 0} stockout risks`);
+      const predictionsData = predictions?.data as { predictions?: unknown[] } | undefined;
+      console.log(`   Found ${predictionsData?.predictions?.length || 0} stockout risks`);
       
       // 3. Diplomat negotiations
       console.log('\n[3/3] 🤝 Running Diplomat Agent...');

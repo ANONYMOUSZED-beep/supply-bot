@@ -222,13 +222,13 @@ app.get('/api/dashboard', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const orgId = req.user!.organizationId;
 
+    // Run queries in parallel for speed
     const [
       inventoryStats,
       supplierCount,
       pendingNegotiations,
       recentOrders,
       lowStockItems,
-      queueStatus,
     ] = await Promise.all([
       // Inventory statistics
       prisma.inventoryItem.aggregate({
@@ -249,24 +249,49 @@ app.get('/api/dashboard', authenticateToken, async (req: AuthRequest, res) => {
         take: 5,
         include: { supplier: true },
       }),
-      // Low stock items
-      prisma.$queryRaw`
-        SELECT i.*, p.sku, p.name 
-        FROM "InventoryItem" i
-        JOIN "Product" p ON i."productId" = p.id
-        WHERE i."organizationId" = ${orgId}
-        AND i."currentStock" <= i."reorderPoint"
-        ORDER BY i."currentStock" / i."reorderPoint" ASC
-        LIMIT 10
-      `,
-      // Queue status
-      orchestrator.getQueueStatus(),
+      // Low stock items - use Prisma query instead of raw SQL for better performance
+      prisma.inventoryItem.findMany({
+        where: {
+          organizationId: orgId,
+        },
+        include: {
+          product: {
+            select: { sku: true, name: true },
+          },
+        },
+        orderBy: { currentStock: 'asc' },
+        take: 10,
+      }).then(items => 
+        items
+          .filter(i => i.currentStock <= i.reorderPoint)
+          .map(i => ({
+            id: i.id,
+            currentStock: i.currentStock,
+            reorderPoint: i.reorderPoint,
+            sku: i.product.sku,
+            name: i.product.name,
+          }))
+      ),
     ]);
+
+    // Get queue status separately (non-blocking) with timeout
+    let queueStatus = { waiting: 0, active: 0, completed: 0, failed: 0 };
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('timeout')), 2000)
+      );
+      queueStatus = await Promise.race([
+        orchestrator.getQueueStatus(),
+        timeoutPromise,
+      ]) as any;
+    } catch {
+      // Use default if orchestrator is slow
+    }
 
     res.json({
       inventory: {
         totalItems: inventoryStats._count,
-        totalStock: inventoryStats._sum.currentStock,
+        totalStock: inventoryStats._sum.currentStock || 0,
       },
       suppliers: supplierCount,
       pendingNegotiations,

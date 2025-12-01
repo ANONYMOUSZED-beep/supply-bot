@@ -929,6 +929,170 @@ app.get('/api/agents/status', authenticateToken, async (req: AuthRequest, res) =
 });
 
 // ==========================================
+// Agent Test Routes
+// ==========================================
+
+// Test Scout Agent - analyze inventory for low stock
+app.post('/api/agents/test/scout', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const orgId = req.user!.organizationId;
+    
+    // Get suppliers to scan
+    const suppliers = await prisma.supplier.findMany({
+      where: { organizationId: orgId, isActive: true },
+      take: 3,
+    });
+
+    if (suppliers.length === 0) {
+      return res.json({
+        agent: 'Scout',
+        message: 'No suppliers found to scan. Add some suppliers first.',
+        result: null,
+      });
+    }
+
+    // Return supplier info that would be scanned
+    res.json({
+      agent: 'Scout',
+      message: `Scout Agent ready to scan ${suppliers.length} supplier(s)`,
+      suppliers: suppliers.map(s => ({
+        id: s.id,
+        name: s.name,
+        website: s.website,
+        hasApi: !!s.apiEndpoint,
+        hasPortal: !!s.portalUrl,
+        lastScraped: s.lastScrapedAt,
+      })),
+      note: 'Full scanning requires Playwright browser - works best locally',
+    });
+  } catch (error) {
+    logger.error('Scout test error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test Strategist Agent - predict stockouts
+app.post('/api/agents/test/strategist', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const orgId = req.user!.organizationId;
+    
+    // Run strategist analysis
+    const result = await strategistAgent.executeTask({
+      id: `test-${Date.now()}`,
+      type: 'predict_stockouts',
+      payload: { organizationId: orgId },
+      priority: 1,
+      scheduledAt: new Date(),
+    });
+
+    res.json({
+      agent: 'Strategist',
+      message: result.success ? 'Analysis complete' : 'Analysis failed',
+      result: result.success ? result.data : null,
+      error: result.error,
+    });
+  } catch (error) {
+    logger.error('Strategist test error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test Diplomat Agent - generate negotiation email
+app.post('/api/agents/test/diplomat', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const orgId = req.user!.organizationId;
+    const { supplierId, productId } = req.body;
+
+    // Get a supplier to negotiate with
+    let supplier;
+    if (supplierId) {
+      supplier = await prisma.supplier.findFirst({
+        where: { id: supplierId, organizationId: orgId },
+      });
+    } else {
+      supplier = await prisma.supplier.findFirst({
+        where: { organizationId: orgId, isActive: true },
+        include: { supplierProducts: { take: 1, include: { product: true } } },
+      });
+    }
+
+    if (!supplier) {
+      return res.json({
+        agent: 'Diplomat',
+        message: 'No suppliers found. Add suppliers first.',
+        result: null,
+      });
+    }
+
+    // Get a product to negotiate
+    const supplierProduct = await prisma.supplierProduct.findFirst({
+      where: { supplierId: supplier.id },
+      include: { product: true },
+    });
+
+    if (!supplierProduct) {
+      return res.json({
+        agent: 'Diplomat',
+        message: `Supplier ${supplier.name} has no products. Link products to supplier first.`,
+        result: null,
+      });
+    }
+
+    // Generate a sample negotiation strategy using AI
+    const result = await diplomatAgent.executeTask({
+      id: `test-${Date.now()}`,
+      type: 'analyze_negotiation_opportunity',
+      payload: {
+        organizationId: orgId,
+        supplierId: supplier.id,
+        productId: supplierProduct.productId,
+        quantity: 100,
+      },
+      priority: 1,
+      scheduledAt: new Date(),
+    });
+
+    res.json({
+      agent: 'Diplomat',
+      message: result.success ? 'Negotiation analysis complete' : 'Analysis requires more data',
+      supplier: supplier.name,
+      product: supplierProduct.product.name,
+      result: result.success ? result.data : null,
+      error: result.error,
+    });
+  } catch (error) {
+    logger.error('Diplomat test error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Quick AI test - just test if Gemini is working
+app.get('/api/agents/test/ai', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const testPrompt = "You are a supply chain assistant. Respond with a single sentence about the importance of supplier negotiations.";
+    
+    const genAI = new (await import('@google/generative-ai')).GoogleGenerativeAI(config.ai.geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: config.ai.geminiModel });
+    
+    const result = await model.generateContent(testPrompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({
+      success: true,
+      model: config.ai.geminiModel,
+      response: text,
+    });
+  } catch (error: any) {
+    logger.error('AI test error', { error });
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'AI test failed',
+    });
+  }
+});
+
+// ==========================================
 // Activity Log Routes
 // ==========================================
 

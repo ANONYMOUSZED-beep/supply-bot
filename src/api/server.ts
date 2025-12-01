@@ -899,11 +899,19 @@ app.post('/api/agents/auto-reorder', authenticateToken, async (req: AuthRequest,
 
 app.get('/api/agents/status', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    // Return fast response - don't wait for slow health checks
+    const timeoutMs = 3000;
+    const withTimeout = <T>(promise: Promise<T>, fallback: T): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<T>(resolve => setTimeout(() => resolve(fallback), timeoutMs))
+      ]);
+
     const [scoutHealth, strategistHealth, diplomatHealth, queueStatus] = await Promise.all([
-      scoutAgent.healthCheck(),
-      strategistAgent.healthCheck(),
-      diplomatAgent.healthCheck(),
-      orchestrator.getQueueStatus(),
+      withTimeout(scoutAgent.healthCheck(), false),
+      withTimeout(strategistAgent.healthCheck(), false),
+      withTimeout(diplomatAgent.healthCheck(), false),
+      withTimeout(orchestrator.getQueueStatus(), { waiting: 0, active: 0, completed: 0, failed: 0 }),
     ]);
 
     res.json({

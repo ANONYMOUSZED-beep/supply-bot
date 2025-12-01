@@ -140,6 +140,52 @@ app.post('/api/auth/register', async (req, res) => {
       include: { organization: true },
     });
 
+    // Create sample data for the new organization
+    const sampleSupplier = await prisma.supplier.create({
+      data: {
+        organizationId: organization.id,
+        name: 'Sample Supplier Co.',
+        contactEmail: 'sales@samplesupplier.com',
+        website: 'https://samplesupplier.com',
+        category: 'General Supplies',
+        isActive: true,
+        reliability: 0.9,
+      },
+    });
+
+    const sampleProduct = await prisma.product.create({
+      data: {
+        organizationId: organization.id,
+        sku: 'SAMPLE-001',
+        name: 'Sample Product',
+        description: 'Your first tracked product',
+        category: 'General',
+        unit: 'units',
+      },
+    });
+
+    await prisma.inventoryItem.create({
+      data: {
+        organizationId: organization.id,
+        productId: sampleProduct.id,
+        currentStock: 100,
+        reorderPoint: 20,
+        reorderQuantity: 50,
+        safetyStock: 10,
+      },
+    });
+
+    await prisma.supplierProduct.create({
+      data: {
+        supplierId: sampleSupplier.id,
+        productId: sampleProduct.id,
+        supplierSku: 'SUP-SAMPLE-001',
+        unitPrice: 10.00,
+        minOrderQty: 10,
+        inStock: true,
+      },
+    });
+
     const token = jwt.sign(
       {
         userId: user.id,
@@ -150,7 +196,7 @@ app.post('/api/auth/register', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    logger.info(`New user registered: ${email}`);
+    logger.info(`New user registered: ${email} with sample data`);
 
     res.status(201).json({
       token,

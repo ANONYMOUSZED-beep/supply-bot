@@ -340,9 +340,115 @@ app.get('/api/inventory/predictions', authenticateToken, async (req: AuthRequest
   }
 });
 
+// Update inventory item
+app.put('/api/inventory/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { currentStock, reorderPoint, reorderQuantity, safetyStock } = req.body;
+
+    const item = await prisma.inventoryItem.update({
+      where: { id },
+      data: {
+        ...(currentStock !== undefined && { currentStock }),
+        ...(reorderPoint !== undefined && { reorderPoint }),
+        ...(reorderQuantity !== undefined && { reorderQuantity }),
+        ...(safetyStock !== undefined && { safetyStock }),
+      },
+      include: {
+        product: {
+          include: {
+            supplierProducts: {
+              include: { supplier: true },
+            },
+          },
+        },
+      },
+    });
+
+    res.json(item);
+  } catch (error) {
+    logger.error('Update inventory error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create inventory item
+app.post('/api/inventory', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { productId, currentStock, reorderPoint, reorderQuantity, safetyStock } = req.body;
+
+    const item = await prisma.inventoryItem.create({
+      data: {
+        organizationId: req.user!.organizationId,
+        productId,
+        currentStock: currentStock || 0,
+        reorderPoint: reorderPoint || 10,
+        reorderQuantity: reorderQuantity || 50,
+        safetyStock: safetyStock || 5,
+      },
+      include: {
+        product: true,
+      },
+    });
+
+    res.status(201).json(item);
+  } catch (error) {
+    logger.error('Create inventory error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ==========================================
 // Supplier Routes
 // ==========================================
+
+// Products endpoints
+app.get('/api/products', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { organizationId: req.user!.organizationId, isActive: true },
+      include: {
+        supplierProducts: {
+          include: { supplier: true },
+          orderBy: { unitPrice: 'asc' },
+        },
+        inventoryItem: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    res.json(products);
+  } catch (error) {
+    logger.error('Get products error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/products', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { sku, name, description, category, unit } = req.body;
+
+    if (!sku || !name) {
+      return res.status(400).json({ error: 'SKU and name are required' });
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        organizationId: req.user!.organizationId,
+        sku,
+        name,
+        description: description || '',
+        category: category || 'General',
+        unit: unit || 'units',
+      },
+    });
+
+    res.status(201).json(product);
+  } catch (error) {
+    logger.error('Create product error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.get('/api/suppliers', authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -433,6 +539,49 @@ app.get('/api/suppliers/:id/prices', authenticateToken, async (req: AuthRequest,
   }
 });
 
+// Update supplier
+app.put('/api/suppliers/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { name, website, contactEmail, contactPhone, isActive, portalType } = req.body;
+
+    const supplier = await prisma.supplier.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(website !== undefined && { website }),
+        ...(contactEmail !== undefined && { contactEmail }),
+        ...(contactPhone !== undefined && { contactPhone }),
+        ...(isActive !== undefined && { isActive }),
+        ...(portalType !== undefined && { category: portalType }),
+      },
+      include: {
+        _count: { select: { supplierProducts: true, purchaseOrders: true } },
+      },
+    });
+
+    res.json({ ...supplier, rating: supplier.reliability || 0, portalType: supplier.category || 'static' });
+  } catch (error) {
+    logger.error('Update supplier error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete supplier
+app.delete('/api/suppliers/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    await prisma.supplier.update({
+      where: { id: req.params.id },
+      data: { isActive: false },
+    });
+
+    res.json({ success: true, message: 'Supplier deactivated' });
+  } catch (error) {
+    logger.error('Delete supplier error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ==========================================
 // Negotiation Routes
 // ==========================================
@@ -500,6 +649,62 @@ app.post('/api/negotiations/:id/respond', authenticateToken, async (req: AuthReq
   }
 });
 
+// Send negotiation message (for follow-ups)
+app.post('/api/negotiations/:id/messages', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { message } = req.body;
+    const { id } = req.params;
+
+    // Create the message
+    const negotiationMessage = await prisma.negotiationMessage.create({
+      data: {
+        negotiationId: id,
+        direction: 'outbound',
+        channel: 'email',
+        subject: 'Follow-up',
+        content: message,
+        sentAt: new Date(),
+      },
+    });
+
+    // Update negotiation last activity
+    await prisma.negotiation.update({
+      where: { id },
+      data: { status: 'in_progress' },
+    });
+
+    res.status(201).json(negotiationMessage);
+  } catch (error) {
+    logger.error('Send negotiation message error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get single negotiation with all messages
+app.get('/api/negotiations/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const negotiation = await prisma.negotiation.findFirst({
+      where: { 
+        id: req.params.id,
+        organizationId: req.user!.organizationId,
+      },
+      include: {
+        supplier: true,
+        messages: { orderBy: { sentAt: 'asc' } },
+      },
+    });
+
+    if (!negotiation) {
+      return res.status(404).json({ error: 'Negotiation not found' });
+    }
+
+    res.json(negotiation);
+  } catch (error) {
+    logger.error('Get negotiation error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ==========================================
 // Purchase Order Routes
 // ==========================================
@@ -524,7 +729,48 @@ app.get('/api/orders', authenticateToken, async (req: AuthRequest, res) => {
 
 app.post('/api/orders', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { supplierId, items } = req.body;
+    const { supplierId, items, productId, quantity } = req.body;
+
+    // Handle simple reorder from inventory page
+    if (productId && quantity && !items) {
+      // Find supplier for this product
+      const supplierProduct = await prisma.supplierProduct.findFirst({
+        where: { productId },
+        include: { supplier: true, product: true },
+        orderBy: { unitPrice: 'asc' },
+      });
+
+      if (!supplierProduct) {
+        return res.status(400).json({ error: 'No supplier found for this product' });
+      }
+
+      const order = await prisma.purchaseOrder.create({
+        data: {
+          organizationId: req.user!.organizationId,
+          supplierId: supplierProduct.supplierId,
+          orderNumber: `PO-${Date.now()}`,
+          status: 'pending',
+          totalAmount: supplierProduct.unitPrice * quantity,
+          items: {
+            create: [{
+              productSku: supplierProduct.product.sku,
+              productName: supplierProduct.product.name,
+              quantity,
+              unitPrice: supplierProduct.unitPrice,
+              totalPrice: supplierProduct.unitPrice * quantity,
+            }],
+          },
+        },
+        include: { items: true, supplier: true },
+      });
+
+      return res.status(201).json(order);
+    }
+
+    // Handle full order with items array
+    if (!supplierId || !items || !items.length) {
+      return res.status(400).json({ error: 'Supplier and items are required' });
+    }
 
     const order = await prisma.purchaseOrder.create({
       data: {
@@ -546,9 +792,58 @@ app.post('/api/orders', authenticateToken, async (req: AuthRequest, res) => {
       include: { items: true },
     });
 
-    res.json(order);
+    res.status(201).json(order);
   } catch (error) {
     logger.error('Create order error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update order status
+app.put('/api/orders/:id/status', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['draft', 'pending', 'approved', 'sent', 'confirmed', 'shipped', 'received', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const order = await prisma.purchaseOrder.update({
+      where: { id },
+      data: { 
+        status,
+        ...(status === 'received' && { actualDelivery: new Date() }),
+      },
+      include: { supplier: true, items: true },
+    });
+
+    res.json(order);
+  } catch (error) {
+    logger.error('Update order status error', { error });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get single order
+app.get('/api/orders/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const order = await prisma.purchaseOrder.findFirst({
+      where: { 
+        id: req.params.id,
+        organizationId: req.user!.organizationId,
+      },
+      include: { supplier: true, items: true },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(order);
+  } catch (error) {
+    logger.error('Get order error', { error });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

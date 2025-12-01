@@ -60,14 +60,20 @@ export default function OrdersPage() {
     showNotification('success', 'Print dialog opened');
   };
 
-  const handleUpdateStatus = (newStatus: string) => {
+  const handleUpdateStatus = async (newStatus: string) => {
     if (selectedOrder) {
-      // Update locally for demo
-      setOrders(orders.map(o => 
-        o.id === selectedOrder.id ? { ...o, status: newStatus } : o
-      ));
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
-      showNotification('success', `Order status updated to ${newStatus}`);
+      try {
+        await api.updateOrderStatus(selectedOrder.id, newStatus);
+        // Update locally after successful API call
+        setOrders(orders.map(o => 
+          o.id === selectedOrder.id ? { ...o, status: newStatus } : o
+        ));
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+        showNotification('success', `Order status updated to ${newStatus}`);
+      } catch (error) {
+        console.error('Failed to update order status:', error);
+        showNotification('error', 'Failed to update order status');
+      }
       setShowStatusModal(false);
     }
   };

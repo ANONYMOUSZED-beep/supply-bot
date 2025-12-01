@@ -35,6 +35,126 @@ interface Negotiation {
   messages: NegotiationMessage[];
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  contactEmail: string;
+}
+
+// New Negotiation Form Component
+function NewNegotiationForm({
+  onClose,
+  onSuccess,
+  showNotification,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+  showNotification: (type: 'success' | 'error', message: string) => void;
+}) {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [formData, setFormData] = useState({
+    supplierId: '',
+    targetDiscount: 10,
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const data = await api.getSuppliers();
+        setSuppliers(Array.isArray(data) ? data : []);
+        if (data.length > 0) {
+          setFormData(f => ({ ...f, supplierId: data[0].id }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch suppliers:', error);
+      } finally {
+        setLoadingSuppliers(false);
+      }
+    };
+    fetchSuppliers();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.supplierId) {
+      showNotification('error', 'Please select a supplier');
+      return;
+    }
+    
+    setSubmitting(true);
+    try {
+      await api.createNegotiation({
+        supplierId: formData.supplierId,
+        targetDiscount: formData.targetDiscount,
+      });
+      showNotification('success', 'Negotiation initiated - AI agent will begin outreach');
+      onSuccess();
+    } catch (error) {
+      console.error('Failed to create negotiation:', error);
+      showNotification('error', 'Failed to start negotiation');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+          {loadingSuppliers ? (
+            <div className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-500">Loading suppliers...</div>
+          ) : suppliers.length === 0 ? (
+            <div className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-500">No suppliers available. Add a supplier first.</div>
+          ) : (
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              value={formData.supplierId}
+              onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+              required
+            >
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Target Discount (%)</label>
+          <input
+            type="number"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            placeholder="10"
+            min="1"
+            max="50"
+            value={formData.targetDiscount}
+            onChange={(e) => setFormData({ ...formData, targetDiscount: parseInt(e.target.value) || 10 })}
+          />
+        </div>
+      </div>
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          disabled={submitting}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          disabled={submitting || loadingSuppliers || suppliers.length === 0}
+        >
+          {submitting ? 'Starting...' : 'Start Negotiation'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function NegotiationsPage() {
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,23 +170,30 @@ export default function NegotiationsPage() {
   };
 
   const handleSendFollowup = async () => {
+    if (!selectedNegotiation) return;
+    
     setSendingFollowup(true);
-    setTimeout(() => {
-      if (selectedNegotiation) {
-        const newMessage: NegotiationMessage = {
-          id: Date.now().toString(),
-          content: 'Following up on our previous discussion. Looking forward to your response.',
-          direction: 'outbound',
-          sentAt: new Date().toISOString(),
-        };
-        setSelectedNegotiation({
-          ...selectedNegotiation,
-          messages: [...selectedNegotiation.messages, newMessage],
-        });
-        showNotification('success', 'Follow-up message sent');
-      }
+    try {
+      const message = 'Following up on our previous discussion. Looking forward to your response.';
+      await api.sendNegotiationMessage(selectedNegotiation.id, message);
+      
+      const newMessage: NegotiationMessage = {
+        id: Date.now().toString(),
+        content: message,
+        direction: 'outbound',
+        sentAt: new Date().toISOString(),
+      };
+      setSelectedNegotiation({
+        ...selectedNegotiation,
+        messages: [...(selectedNegotiation.messages || []), newMessage],
+      });
+      showNotification('success', 'Follow-up message sent');
+    } catch (error) {
+      console.error('Failed to send follow-up:', error);
+      showNotification('error', 'Failed to send follow-up message');
+    } finally {
       setSendingFollowup(false);
-    }, 1000);
+    }
   };
 
   const handleViewThread = () => {
@@ -147,34 +274,11 @@ export default function NegotiationsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Start New Negotiation</h3>
-            <form onSubmit={(e) => { e.preventDefault(); showNotification('success', 'Negotiation initiated - AI agent will begin outreach'); setShowNewNegotiationModal(false); }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    <option>Northern Lumber Co.</option>
-                    <option>Hardware Supply Direct</option>
-                    <option>Premium Finishes Inc.</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Target Discount (%)</label>
-                  <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="10" min="1" max="50" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Products</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                    <option>All Products</option>
-                    <option>Oak Lumber</option>
-                    <option>Hardware Items</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-6 flex gap-3">
-                <button type="button" onClick={() => setShowNewNegotiationModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Start Negotiation</button>
-              </div>
-            </form>
+            <NewNegotiationForm
+              onClose={() => setShowNewNegotiationModal(false)}
+              onSuccess={() => { fetchNegotiations(); setShowNewNegotiationModal(false); }}
+              showNotification={showNotification}
+            />
           </div>
         </div>
       )}

@@ -26,6 +26,7 @@ interface DashboardData {
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Loading dashboard...');
   const [runningCycle, setRunningCycle] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
@@ -62,6 +63,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      // Show waking up message after 3 seconds
+      const wakeUpTimer = setTimeout(() => {
+        setLoadingMessage('Waking up server (free tier cold start)...');
+      }, 3000);
+      
+      // Show still loading message after 10 seconds
+      const stillLoadingTimer = setTimeout(() => {
+        setLoadingMessage('Still connecting... please wait...');
+      }, 10000);
+
       try {
         const apiData = await api.getDashboard();
         setData(apiData);
@@ -77,6 +88,8 @@ export default function Dashboard() {
           queueStatus: { waiting: 0, active: 0, completed: 0, failed: 0 },
         });
       } finally {
+        clearTimeout(wakeUpTimer);
+        clearTimeout(stillLoadingTimer);
         setLoading(false);
       }
     };
@@ -86,8 +99,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-gray-600 text-sm">{loadingMessage}</p>
+        <p className="text-gray-400 text-xs mt-2">First load may take 30-60 seconds</p>
       </div>
     );
   }
